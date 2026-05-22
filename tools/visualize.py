@@ -162,7 +162,7 @@ def plot_progress(rows: list[dict], roofline: float, out_path: Path) -> None:
                 linewidth=1.4,
             )
 
-    ax1.axhline(roofline, linestyle="--", color="#1f1f1f", linewidth=1.4, label=f"roofline {roofline:.3f} TFLOPS")
+    ax1.axhline(roofline, linestyle="--", color="#1f1f1f", linewidth=1.4, label=f"derived ceiling {roofline:.3f} TFLOPS")
     ax1.set_xlabel("experiment ordinal")
     ax1.set_ylabel("throughput (TFLOPS)")
     ax1.set_title("throughput timeline by experiment")
