@@ -105,7 +105,7 @@ def compute_manifest(root: str, locked_paths=None, artifact: str = DEFAULT_ARTIF
 def verify(root: str, manifest: dict, artifact: str | None = None) -> list[tuple[str, str, str]]:
     """Return a list of (kind, relpath, detail) violations; empty == the tree matches canonical.
 
-    kind is one of: modified | missing | unlisted.
+    kind is one of: modified | missing | unlisted | stray.
     """
     artifact = artifact or manifest.get("artifact", DEFAULT_ARTIFACT)
     locked_paths = manifest["locked_paths"]
@@ -122,6 +122,23 @@ def verify(root: str, manifest: dict, artifact: str | None = None) -> list[tuple
     for rel in actual:
         if rel not in expected:
             violations.append(("unlisted", rel, "file present under a locked path but not in manifest"))
+
+    # Depth-0 stray scan: a planted repo-root `*.py` (e.g. `torch.py` shadowing the real torch, or
+    # `sitecustomize.py` running at interpreter startup) sits OUTSIDE every locked path, so the walk
+    # above never sees it. Only the mutable artifact and root files already pinned in the manifest
+    # (e.g. `benchmark.py`) may exist at the top level; any other top-level `.py` is a violation.
+    try:
+        for fn in sorted(os.listdir(root)):
+            if not fn.endswith(".py") or _is_ignored(fn):
+                continue
+            if not os.path.isfile(os.path.join(root, fn)):
+                continue
+            if fn == artifact or fn in expected:
+                continue
+            violations.append(("stray", fn, "unexpected top-level .py outside any locked path (import-shadow risk)"))
+    except OSError:
+        pass
+
     violations.sort(key=lambda v: (v[0], v[1]))
     return violations
 
@@ -191,6 +208,12 @@ def _self_test() -> int:
         # d) modify the ARTIFACT -> NO violation (kernel.py is the one file allowed to differ)
         _write(tmp, "kernel.py", "print('artifact v2 - a winning submission')\n")
         check(verify(tmp, man) == [], "artifact (kernel.py) may differ -> still 0 violations")
+
+        # e) plant a stray top-level torch.py (module-shadow / sitecustomize vector) -> 'stray'
+        _write(tmp, "torch.py", "import os  # would shadow the real torch if on sys.path\n")
+        v = verify(tmp, man)
+        check(any(k == "stray" and r == "torch.py" for k, r, _ in v), "stray top-level .py caught")
+        os.remove(os.path.join(tmp, "torch.py"))
 
         # restored tree verifies clean again
         check(verify(tmp, man) == [], "restored tree verifies clean")

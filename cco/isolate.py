@@ -386,8 +386,14 @@ def run_isolated(kernel_path: str, config: dict, seed: int, compare_fn, *,
                                "timed_buffers": timed_cpu, "mut_key": mut_key,
                                "capture_blocks": capture_blocks, "cap_rep": cap_rep}}, job_path)
 
-        boot = (f"import sys; sys.path.insert(0, {_repo_root()!r}); "
-                f"from cco.isolate import _child_main; _child_main(sys.argv[1], sys.argv[2])")
+        # Import torch FIRST (the real one from site-packages) and APPEND the repo root rather than
+        # inserting it at sys.path[0]. Otherwise a planted repo-root `torch.py` (or `triton.py`, ...)
+        # would be imported before the genuine package and defeat the capture-before-load timing
+        # defense. With torch already loaded and the repo root LAST on the path, nothing the child or
+        # the kernel imports can be shadowed by a top-level sibling of `kernel.py`.
+        boot = ("import sys, torch; "
+                f"sys.path.append({_repo_root()!r}); "
+                "from cco.isolate import _child_main; _child_main(sys.argv[1], sys.argv[2])")
         env = {k: v for k, v in os.environ.items() if not k.startswith("PYTHON")}
         cmd = [sys.executable, "-E", "-c", boot, job_path, out_path]
 
