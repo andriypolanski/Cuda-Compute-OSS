@@ -64,6 +64,14 @@ DENY_QUALIFIED_NAMES = frozenset({
     "torch._scaled_mm", "torch._int_mm", "torch._weight_int4pack_mm", "torch._weight_int8pack_mm",
     # JIT-compiling the kernel = delegating kernel generation (Inductor can emit a cuBLAS/CUTLASS GEMM)
     "torch.compile",
+    # CUDA stream / event / graph manipulation — a Triton kernel launches on the current (timed) stream
+    # and needs none of these; allowing them lets a correct kernel move its real work onto a SIDE stream
+    # so the timed CUDA events under-report (the full-device sync still waits, so it stays correct but
+    # times fast). Banning the side-stream API makes the captured event timing faithful.
+    "torch.cuda.Stream", "torch.cuda.ExternalStream", "torch.cuda.stream", "torch.cuda.StreamContext",
+    "torch.cuda.set_stream", "torch.cuda.current_stream", "torch.cuda.default_stream",
+    "torch.cuda.Event", "torch.cuda.graph", "torch.cuda.CUDAGraph",
+    "torch.cuda.make_graphed_callables", "torch.cuda.graph_pool_handle",
 })
 
 # Whole namespaces that are off-limits (prefix match).
@@ -80,6 +88,7 @@ DENY_QUALIFIED_PREFIXES = (
     "torch.fx",                   # graph capture -> codegen
     "torch.jit",                  # TorchScript compile path
     "torch.classes",              # torch.classes.load_library -> dlopen escape
+    "torch.cuda.graphs",          # CUDA graph capture -> replay can distort the timed window
 )
 
 # Tensor methods that ARE the computation, flagged on any receiver (we usually can't
@@ -96,14 +105,27 @@ DENY_BUILTINS = frozenset({
     "eval", "exec", "compile", "__import__", "getattr", "setattr", "globals", "vars", "open",
 })
 
-# Introspection/traversal dunder ATTRIBUTES that defeat a name-based scan by reaching an arbitrary
-# callable dynamically (e.g. `torch.__dict__['matmul'](a, b)`, `x.__getattribute__('mm')(...)`,
-# `().__class__.__bases__[0].__subclasses__()`). Flagged on ANY access — a legit Triton kernel never
-# touches them (it launches via `kernel[grid](...)`, which is a Subscript on a Name, not these). We do
-# NOT flag Subscript-headed calls in general precisely because `kernel[grid](args)` is the Triton idiom.
+# Introspection ATTRIBUTES that defeat a name-based scan by reaching state the kernel must not touch.
+# Two families, both flagged on ANY access (a legit Triton kernel never uses them; it launches via
+# `kernel[grid](...)`, a Subscript on a Name — NOT these; we do not flag Subscript-headed calls in
+# general precisely because that is the Triton idiom):
+#   (1) dynamic-dispatch / class-traversal: torch.__dict__['matmul'](a,b), x.__getattribute__('mm')(),
+#       ().__class__.__bases__[0].__subclasses__();
+#   (2) STACK-FRAME walking — the scorer runs the kernel in the same interpreter, so any local in any
+#       caller frame (the SECRET probe schedule lives in cco/isolate.py's timed loop) is reachable via
+#       a traceback or generator frame: `raise E; except E as e: e.__traceback__.tb_frame.f_back.f_locals`.
+#       With getattr/eval/__import__ and the sys/inspect/traceback imports already banned, banning the
+#       attribute names below makes frame-walking INEXPRESSIBLE — there is no traceback->frame->locals
+#       path that avoids tb_frame / f_back / f_locals.
 DENY_DUNDER_ATTRS = frozenset({
+    # (1) dynamic dispatch / class traversal
     "__dict__", "__getattribute__", "__getattr__", "__globals__", "__builtins__",
     "__subclasses__", "__bases__", "__mro__", "__base__", "__class__",
+    # (2) stack-frame / traceback / code / closure walking
+    "__traceback__", "with_traceback", "tb_frame", "tb_next",
+    "f_back", "f_locals", "f_globals", "f_builtins", "f_code", "f_trace",
+    "gi_frame", "cr_frame", "ag_frame", "gi_code", "cr_code",
+    "__code__", "__closure__", "cell_contents",
 })
 
 # Imports are an ALLOWLIST, not a denylist (a denylist always lags a new GEMM library). A submission
@@ -588,6 +610,31 @@ _NEGATIVE_CASES = [
     ("file read via open() (could read the secret scoring job)",
      "import torch\ndef kernel_fn(a, b):\n    return open('job.pt', 'rb').read()\n",
      "dynamic-dispatch"),
+    ("stack-frame walk via traceback to read the scorer's secret probe schedule",
+     ("import torch\ndef kernel_fn(a, b):\n"
+      "    try:\n        raise RuntimeError()\n"
+      "    except RuntimeError as e:\n        loc = e.__traceback__.tb_frame.f_back.f_locals\n"
+      "    return loc['probe_set']\n"),
+     "dynamic-dispatch"),
+    ("frame walk via a context-manager __exit__ traceback arg",
+     ("import torch\nclass C:\n    def __enter__(self):\n        return self\n"
+      "    def __exit__(self, t, v, tb):\n        self.f = tb.tb_frame.f_back\n        return True\n"
+      "def kernel_fn(a, b):\n    c = C()\n    with c:\n        1 / 0\n    return c.f.f_locals\n"),
+     "dynamic-dispatch"),
+    ("frame walk via a generator's gi_frame",
+     ("import torch\ndef _g():\n    yield 1\ndef kernel_fn(a, b):\n"
+      "    return _g().gi_frame.f_back.f_locals\n"),
+     "dynamic-dispatch"),
+    ("closure-cell read",
+     ("import torch\ndef kernel_fn(a, b):\n    f = (lambda: a)\n    return f.__closure__[0].cell_contents\n"),
+     "dynamic-dispatch"),
+    ("side-stream timing under-report via torch.cuda.Stream",
+     ("import torch\ndef kernel_fn(a, b):\n    s = torch.cuda.Stream()\n"
+      "    with torch.cuda.stream(s):\n        return a + b\n"),
+     "delegation"),
+    ("CUDA-graph capture to distort the timed window",
+     "import torch\ndef kernel_fn(a, b):\n    g = torch.cuda.CUDAGraph()\n    return a + b\n",
+     "delegation"),
 ]
 
 

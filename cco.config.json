@@ -32,12 +32,17 @@
         "torch.softmax", "torch.log_softmax",
         "torch.rms_norm", "torch.layer_norm", "torch.group_norm", "torch.silu", "torch.glu",
         "torch._scaled_mm", "torch._int_mm", "torch._weight_int4pack_mm", "torch._weight_int8pack_mm",
-        "torch.compile"
+        "torch.compile",
+        "torch.cuda.Stream", "torch.cuda.ExternalStream", "torch.cuda.stream", "torch.cuda.StreamContext",
+        "torch.cuda.set_stream", "torch.cuda.current_stream", "torch.cuda.default_stream",
+        "torch.cuda.Event", "torch.cuda.graph", "torch.cuda.CUDAGraph",
+        "torch.cuda.make_graphed_callables", "torch.cuda.graph_pool_handle"
       ],
       "deny_qualified_prefixes": [
         "torch.nn.functional", "torch.ops", "torch._C", "torch.linalg", "torch.utils.cpp_extension",
         "torch.overrides", "torch.utils._python_dispatch",
-        "torch._dynamo", "torch._inductor", "torch.fx", "torch.jit", "torch.classes"
+        "torch._dynamo", "torch._inductor", "torch.fx", "torch.jit", "torch.classes",
+        "torch.cuda.graphs"
       ],
       "deny_methods": [
         "matmul", "mm", "bmm", "addmm", "baddbmm", "addbmm", "einsum", "tensordot",
@@ -48,7 +53,11 @@
       ],
       "deny_dunder_attrs": [
         "__dict__", "__getattribute__", "__getattr__", "__globals__", "__builtins__",
-        "__subclasses__", "__bases__", "__mro__", "__base__", "__class__"
+        "__subclasses__", "__bases__", "__mro__", "__base__", "__class__",
+        "__traceback__", "with_traceback", "tb_frame", "tb_next",
+        "f_back", "f_locals", "f_globals", "f_builtins", "f_code", "f_trace",
+        "gi_frame", "cr_frame", "ag_frame", "gi_code", "cr_code",
+        "__code__", "__closure__", "cell_contents"
       ],
       "_import_policy": "ALLOWLIST: a submission may import ONLY these top-level modules; everything else (escapes + alternate GPU-compute libraries that could matmul outside torch's interposed view) is rejected.",
       "allow_import_modules": [

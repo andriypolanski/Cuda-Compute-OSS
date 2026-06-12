@@ -57,6 +57,11 @@ Triton-only.** `kernel_fn` (and anything it calls) may **not**:
 - reach any of the above through aliases, `getattr` / `eval` / `exec` / `importlib`, introspection
   dunders (`__dict__` / `__getattribute__` / `__class__` …), `open` (no file I/O), or tensor methods
   (`a.mm(b)`);
+- walk the interpreter stack to read the scorer's state — `__traceback__` / `tb_frame` / `f_back` /
+  `f_locals` / `gi_frame` / `__code__` / `__closure__` / `cell_contents` (the timed loop runs your
+  kernel in the same interpreter; these are banned so the secret correctness-probe schedule stays secret);
+- create CUDA streams / events / graphs (`torch.cuda.Stream` / `Event` / `CUDAGraph` …) — your Triton
+  kernel launches on the current timed stream; moving work off it to under-report timing is rejected;
 - use inline CUDA-C (`torch.utils.cpp_extension`), or pop/neuter the runtime trap
   (`torch.overrides`, `torch.utils._python_dispatch`);
 - define `get_inputs`/`get_flops`/`get_bytes`.

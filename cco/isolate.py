@@ -73,6 +73,14 @@ def _has_nan_inf(out) -> bool:
     return False
 
 
+def _invoke(fn, kw):
+    """Module-level trampoline: the kernel is ALWAYS called through here, so its immediate caller frame
+    (`fn`, `kw` only) holds no scoring secrets. Defense-in-depth behind the static frame-attribute ban:
+    even if some frame-introspection vector slipped the guard, the kernel's `f_back` exposes nothing,
+    and the secret probe schedule lives further up the stack (in run_isolated's child loop)."""
+    return fn(**kw)
+
+
 # =====================================================================================
 # CHILD — runs in the isolated subprocess. Untrusted-kernel territory; runs kernel_fn on each
 # parent-provided input and returns the raw outputs. Makes NO judgement.
@@ -206,12 +214,12 @@ def _child_main(job_path: str, out_path: str) -> int:
             g = 0                                                   # global timed-call index
             with delegation_trap() as _trap_verify:
                 for i in range(min(n_pre, nb)):
-                    scored_val.append(_to_cpu(kernel_fn(**bufs[i])))
+                    scored_val.append(_to_cpu(_invoke(kernel_fn, bufs[i])))
 
                 for _ in range(int(sc["warmup"])):
                     mutate(0, g)
                     g += 1
-                    kernel_fn(**tbufs[0])
+                    _invoke(kernel_fn, tbufs[0])
                 _sync()
                 s = _Event(enable_timing=True)
                 e = _Event(enable_timing=True)
@@ -224,7 +232,7 @@ def _child_main(job_path: str, out_path: str) -> int:
                         mutate(g % ntb, g)
                         grab = (blk, r) in probe_set
                         in_clone = clone_in(tb) if grab else None   # the exact input handed to the kernel
-                        out = kernel_fn(**tb)
+                        out = _invoke(kernel_fn, tb)
                         if grab:
                             probe_in_gpu.append(in_clone)
                             probe_out_gpu.append(clone_gpu(out))
@@ -241,7 +249,7 @@ def _child_main(job_path: str, out_path: str) -> int:
                 timed_wall_s = _perf() - _t0
 
                 for i in range(n_pre, nb):
-                    scored_val.append(_to_cpu(kernel_fn(**bufs[i])))
+                    scored_val.append(_to_cpu(_invoke(kernel_fn, bufs[i])))
                 _sync()
 
             probe_inputs = [{k: (_to_cpu(v) if hasattr(v, "detach") else v) for k, v in p.items()}
@@ -434,7 +442,10 @@ def run_isolated(kernel_path: str, config: dict, seed: int, compare_fn, *,
     import secrets as _secrets
     _srng = random.Random(_secrets.randbits(128))
     total_timed = n_blocks * rep
-    n_probe = max(4, min(24, total_timed // 8)) if total_timed > 4 else total_timed
+    # Sample enough positions that even a kernel garbaging BLINDLY (it cannot read the schedule — the
+    # frame-attribute ban + job deletion keep it secret) is caught with overwhelming probability: to
+    # win it must garbage a large fraction f of calls, and detection = 1-(1-f)^n_probe.
+    n_probe = max(8, min(32, total_timed // 50)) if total_timed > 8 else total_timed
     probe_positions = sorted(divmod(i, rep) for i in _srng.sample(range(total_timed), min(n_probe, total_timed)))
 
     del scored_bufs, timed_bufs, det_inputs_gpu
@@ -615,13 +626,15 @@ def run_isolated(kernel_path: str, config: dict, seed: int, compare_fn, *,
             wall_per_iter_us = (timed_wall_s / denom * 1e6) if denom else 0.0
             if sum(latencies_us) * rep / 1e6 > child_wall_s:          # outer backstop
                 timing_inconsistent = True
-            # Scale anchor: the captured-clock wall (which the kernel cannot patch and which the
-            # full-device sync makes count side-stream work) bounds the cuda-event sample. An honest
-            # kernel's event median is a large fraction of the per-iter wall (the wall only adds launch
-            # /sync overhead); a side-stream under-reporter's events fall well below it. Tightened from
-            # /4 to 0.5x — a real improvement, though a <~2x under-report still needs parent two-point
-            # wall timing (a documented v2 follow-up).
-            if wall_per_iter_us > 0 and event_med_us < wall_per_iter_us * 0.5:  # scale anchor
+            # Scale anchor (backstop to the static torch.cuda.Stream/graph ban): the captured-clock wall
+            # — which the kernel cannot patch, and which the full-device sync makes count any side-stream
+            # work — bounds the cuda-event sample. MEASURED: honest champions run at event_med ~0.965-
+            # 0.982 x wall_per_iter (the wall only adds the small per-iter launch/python overhead), so
+            # 0.85x leaves a comfortable margin while rejecting a side-stream under-reporter that parks
+            # its events at ~0.8x its real (wall) time. Full immunity to a <1.18x under-report would need
+            # parent-driven two-point wall timing (a documented v2 follow-up); the stream ban is the
+            # primary closure of the side-stream channel.
+            if wall_per_iter_us > 0 and event_med_us < wall_per_iter_us * 0.85:  # scale anchor
                 timing_inconsistent = True
             if floor_us > 0 and event_med_us < floor_us:              # absolute roofline floor
                 below_floor = True
