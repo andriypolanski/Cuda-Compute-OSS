@@ -49,6 +49,24 @@ def _legacy_auto_tile(n: int, cfg: Config, free_bytes: int) -> int:
     return min(t, n)
 
 
+def test_config_rejects_non_positive_tile():
+    """A non-positive tile makes gemm._tiles empty, silently returning an
+    uninitialised C. Config must reject it at construction (issue #80)."""
+    for bad in (0, -1, -5):
+        try:
+            Config(tile=bad)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError(f"Config(tile={bad}) should raise ValueError")
+
+
+def test_config_accepts_positive_tile_and_none():
+    # Both valid tile specifications must still construct without error.
+    assert Config(tile=None).tile is None
+    assert Config(tile=256).tile == 256
+
+
 def test_auto_tile_fp16_accumulate_smaller_than_legacy_estimator():
     """fp16+accumulate_fp32 must not inherit fp16 operand sizing in the budget."""
     free = 64 * 1024**2

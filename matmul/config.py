@@ -48,6 +48,12 @@ class Config:
             )
         if not (0.0 < self.vram_fraction <= 0.95):
             raise ValueError("vram_fraction must be in (0, 0.95]")
+        if self.tile is not None and self.tile < 1:
+            # A non-positive tile yields an empty tiling schedule in
+            # gemm._tiles (range(0, n, T) is empty for T <= 0), so the tiled
+            # loop never runs and C is returned uninitialised. Reject it up
+            # front; use None to auto-pick T from free VRAM.
+            raise ValueError("tile must be a positive integer or None")
         if self.storage not in ("ram", "disk", "auto"):
             raise ValueError("storage must be ram|disk|auto")
 
