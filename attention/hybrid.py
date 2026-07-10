@@ -70,11 +70,16 @@ def spectral_global_mix(v, *, freq_decay: float = 1.0):
         raise ValueError("freq_decay must be >= 0")
 
     seq = v.shape[-2]
-    vf = torch.fft.rfft(v, dim=-2)
-    freqs = torch.arange(vf.shape[-2], device=v.device, dtype=v.real.dtype)
+    # torch.fft does not support half precision, and fp16 is the default dtype
+    # (AttentionSpec) -- upcast to a real float before the FFT and restore v's
+    # dtype at the end, mirroring adaptive/correlation_spectral_global_mix.
+    real_dtype = torch.float64 if v.dtype == torch.float64 else torch.float32
+    v_work = v.to(real_dtype)
+    vf = torch.fft.rfft(v_work, dim=-2)
+    freqs = torch.arange(vf.shape[-2], device=v.device, dtype=real_dtype)
     gain = 1.0 / (1.0 + freq_decay * freqs)
     mixed = vf * gain.view(1, 1, -1, 1)
-    return torch.fft.irfft(mixed, n=seq, dim=-2)
+    return torch.fft.irfft(mixed, n=seq, dim=-2).to(v.dtype)
 
 
 def adaptive_spectral_global_mix(
