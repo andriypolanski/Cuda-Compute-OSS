@@ -53,6 +53,21 @@ class Config:
             raise ValueError("vram_fraction must be in (0, 0.95]")
         if self.storage not in ("ram", "disk", "auto"):
             raise ValueError("storage must be ram|disk|auto")
+        # String names must be registered; Transform instances are the
+        # pluggable escape hatch. Fail here (not later via KeyError in
+        # get_transform) so callers get a ValueError before any GPU work.
+        from .transforms import Transform, available
+        if isinstance(self.transform, str):
+            known = available()
+            if self.transform not in known:
+                raise ValueError(
+                    f"unknown transform {self.transform!r}; available: {known}"
+                )
+        elif not isinstance(self.transform, Transform):
+            raise ValueError(
+                f"transform must be a registry name or Transform instance, "
+                f"got {type(self.transform).__name__}"
+            )
 
     @property
     def np_dtype(self) -> np.dtype:

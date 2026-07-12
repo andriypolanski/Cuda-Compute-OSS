@@ -51,6 +51,15 @@ def main(argv=None) -> int:
     try:
         if args.n < 1:
             raise ValueError(f"--n must be a positive integer, got {args.n}")
+        # Validate --transform before Config / Backend construction so an
+        # unknown name exits 2 with error: … instead of a KeyError traceback
+        # after GPU init (get_transform raises KeyError, which this CLI did
+        # not catch — same contract as --n / --vram-fraction in #175).
+        known = available_transforms()
+        if args.transform not in known:
+            raise ValueError(
+                f"unknown transform {args.transform!r}; available: {known}"
+            )
         cfg = Config(
             device=args.device,
             dtype=args.dtype,
