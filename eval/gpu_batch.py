@@ -11,8 +11,10 @@ properly isolated self-hosted runner.
 from __future__ import annotations
 
 import argparse
+import ast
 import hashlib
 import json
+import re
 import shutil
 import subprocess
 from dataclasses import dataclass, replace
@@ -280,17 +282,72 @@ def _rebase_onto_main(checkout: Path) -> bool:
     return True
 
 
+def _class_ranges_by_name(src: str) -> dict[str, tuple[int, int]]:
+    """Map each transform's registered name (its ``name = "..."`` class attribute)
+    to the (start, end) line range of the class that defines it."""
+    ranges: dict[str, tuple[int, int]] = {}
+    try:
+        tree = ast.parse(src)
+    except SyntaxError:
+        return ranges
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.ClassDef):
+            continue
+        for stmt in node.body:
+            if (isinstance(stmt, ast.Assign) and len(stmt.targets) == 1
+                    and isinstance(stmt.targets[0], ast.Name)
+                    and stmt.targets[0].id == "name"
+                    and isinstance(stmt.value, ast.Constant)
+                    and isinstance(stmt.value.value, str)):
+                ranges[stmt.value.value] = (node.lineno, node.end_lineno or node.lineno)
+    return ranges
+
+
+def _changed_hunk_ranges(diff_text: str, path: str) -> list[tuple[int, int]]:
+    """New-file line ranges of the hunks that touch ``path`` in a unified diff."""
+    ranges: list[tuple[int, int]] = []
+    in_file = False
+    for line in diff_text.splitlines():
+        if line.startswith("+++ "):
+            in_file = path in line
+        elif in_file and line.startswith("@@"):
+            m = re.search(r"\+(\d+)(?:,(\d+))?", line)
+            if m:
+                start, count = int(m.group(1)), int(m.group(2) or "1")
+                if count > 0:
+                    ranges.append((start, start + count - 1))
+    return ranges
+
+
+def transform_touched_in(src: str, diff_text: str, name: str,
+                         path: str = "strategy/transforms.py") -> bool:
+    """True if the diff ADDS or MODIFIES the transform registered as ``name`` --
+    verified by the transform's CLASS, not its name string, so a NEW transform
+    (its class is added) and an UPDATE to an existing one (a hunk lands inside its
+    class) both validate the same way. ``src`` is the PR's transforms.py (post
+    rebase), so its line numbers match the diff's new-file hunk ranges."""
+    rng = _class_ranges_by_name(src).get(name)
+    if rng and any(not (e < rng[0] or s > rng[1])
+                   for s, e in _changed_hunk_ranges(diff_text, path)):
+        return True
+    # Fallback for a transform not defined by a conventional `name = "..."`
+    # attribute: the name literal appears in a changed line (e.g. a bare
+    # register_transform call).
+    changed = "\n".join(l for l in diff_text.splitlines()
+                        if l[:1] in "+-" and not l.startswith(("+++", "---")))
+    return f'"{name}"' in changed or f"'{name}'" in changed
+
+
 def _transform_touched(checkout: Path, name: str) -> bool:
     """True if the PR's changes vs origin/main add or modify the transform
     ``name`` in strategy/transforms.py -- so a PR can't claim credit for a
-    transform it did not write. (Run after the rebase, so origin/main...HEAD is
-    exactly the PR's commits.)"""
+    transform it did not write. Run after the rebase, so origin/main...HEAD is
+    exactly the PR's commits, and transforms.py is the PR's version."""
+    src = (checkout / "strategy" / "transforms.py").read_text(encoding="utf-8")
     diff = subprocess.run(
         ["git", "diff", "origin/main...HEAD", "--", "strategy/transforms.py"],
         cwd=checkout, text=True, capture_output=True).stdout
-    changed = "\n".join(l for l in diff.splitlines()
-                        if l[:1] in "+-" and not l.startswith(("+++", "---")))
-    return name in changed
+    return transform_touched_in(src, diff, name)
 
 
 def run_item(

@@ -204,6 +204,63 @@ def test_aggregate_rejects_lucky_seed():
     assert agg["transforms"]["ny"]["score"] == 0.0
 
 
+_TRANSFORMS_SRC = '''\
+class Transform:
+    name = "base"
+
+class RandomizedSVDTransform(Transform):
+    name = "rsvd"
+    def basis(self, n, m):
+        return qr(n, m)
+
+class NystromTransform(Transform):
+    name = "nystrom"
+    def basis(self, n, m):
+        return cols(n, m)
+'''
+
+_UPDATE_RSVD_DIFF = '''\
+--- a/strategy/transforms.py
++++ b/strategy/transforms.py
+@@ -6,2 +6,2 @@ class RandomizedSVDTransform(Transform):
+-    def basis(self, n, m):
+-        return qr4(n, m)
++    def basis(self, n, m):
++        return qr(n, m)
+'''
+
+_ADD_NYSTROM_DIFF = '''\
+--- a/strategy/transforms.py
++++ b/strategy/transforms.py
+@@ -8,0 +9,4 @@
++class NystromTransform(Transform):
++    name = "nystrom"
++    def basis(self, n, m):
++        return cols(n, m)
+'''
+
+_UNRELATED_DIFF = '''\
+--- a/tests/test_x.py
++++ b/tests/test_x.py
+@@ -1 +1 @@
+-x
++y
+'''
+
+
+def test_transform_touched_new_and_update_validate_equally():
+    from eval.gpu_batch import transform_touched_in
+    # UPDATE: modifying rsvd's class body counts, even though the string "rsvd"
+    # never appears in the changed lines -- this is the #156 case that the old
+    # name-in-diff check wrongly rejected.
+    assert transform_touched_in(_TRANSFORMS_SRC, _UPDATE_RSVD_DIFF, "rsvd") is True
+    assert transform_touched_in(_TRANSFORMS_SRC, _UPDATE_RSVD_DIFF, "nystrom") is False
+    # NEW: adding the nystrom class counts -- the #194 case.
+    assert transform_touched_in(_TRANSFORMS_SRC, _ADD_NYSTROM_DIFF, "nystrom") is True
+    # claiming a transform the PR does not touch -> not verified.
+    assert transform_touched_in(_TRANSFORMS_SRC, _UNRELATED_DIFF, "rsvd") is False
+
+
 if __name__ == "__main__":
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     failed = 0
