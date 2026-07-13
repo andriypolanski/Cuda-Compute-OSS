@@ -21,55 +21,15 @@
       "url": "https://github.com/zeokin/Cuda-Compute-OSS/pull/206"
     },
     {
-      "author": "joaovictor91123",
-      "detail": "CPU-safe CI only; no GPU scorecard or queue entry required.",
-      "gpu_required": false,
-      "head_sha": "b4b67c010fae49abc72ec8b85f2a9eb288f630cd",
-      "kind": "fix",
-      "label": "status:ready-non-gpu",
-      "pr": 212,
-      "state": "non_gpu_review",
-      "title": "fix(attention): benchmark CLI reports invalid knobs cleanly (exit 2), not a traceback (Fixes #201)",
-      "updated_at": "2026-07-13T07:08:24Z",
-      "url": "https://github.com/zeokin/Cuda-Compute-OSS/pull/212"
-    },
-    {
-      "author": "galuis116",
-      "detail": "CPU-safe CI only; no GPU scorecard or queue entry required.",
-      "gpu_required": false,
-      "head_sha": "37b075c0bf4cedee91ee2e559451a183e202cc29",
-      "kind": "fix",
-      "label": "status:ready-non-gpu",
-      "pr": 215,
-      "state": "non_gpu_review",
-      "title": "fix(strategy): stop reporting a <1x FLOP ratio as \"fewer FLOPs than exact\"",
-      "updated_at": "2026-07-13T07:08:29Z",
-      "url": "https://github.com/zeokin/Cuda-Compute-OSS/pull/215"
-    },
-    {
-      "author": "RenzoMXD",
-      "detail": "CPU-safe CI only; no GPU scorecard or queue entry required.",
-      "gpu_required": false,
-      "head_sha": "409e1e78370a7dd320d8d41e1dbeee137728f231",
-      "kind": "fix",
-      "label": "status:ready-non-gpu",
-      "pr": 216,
-      "state": "non_gpu_review",
-      "title": "fix(strategy): budget reconstruct()'s resident Q/Ctil, not just the per-row stream",
-      "updated_at": "2026-07-13T07:08:34Z",
-      "url": "https://github.com/zeokin/Cuda-Compute-OSS/pull/216"
-    },
-    {
       "author": "ultrahighsuper",
-      "detail": "gate chain passed; GPU eval runner is not wired up yet in this repo (Phase 2)",
-      "gpu_required": true,
+      "detail": "This PR has merge conflicts with the base branch. Resolve them within 12 hours or the bot will close the PR automatically.",
+      "gpu_required": false,
       "head_sha": "7c7fe70b1b3ae8c1363f82fc2dd66bc8df68bb65",
-      "kind": "feat",
-      "label": "status:queued-gpu",
+      "kind": null,
       "pr": 156,
-      "state": "eval_pending",
+      "state": "needs_merge_conflict_resolution",
       "title": "feat(strategy): rsvd captures 3 subspaces, not 4 (drop redundant col(B) sketch)",
-      "updated_at": "2026-07-13T07:08:42Z",
+      "updated_at": "2026-07-13T07:12:15Z",
       "url": "https://github.com/zeokin/Cuda-Compute-OSS/pull/156"
     },
     {
@@ -82,7 +42,7 @@
       "pr": 185,
       "state": "eval_pending",
       "title": "feat(strategy): subspace-iteration transform for decaying spectra",
-      "updated_at": "2026-07-13T07:08:47Z",
+      "updated_at": "2026-07-13T07:12:20Z",
       "url": "https://github.com/zeokin/Cuda-Compute-OSS/pull/185"
     },
     {
@@ -95,7 +55,7 @@
       "pr": 192,
       "state": "eval_pending",
       "title": "feat(strategy): add fixed DCT-II basis transform for smooth data",
-      "updated_at": "2026-07-13T07:08:52Z",
+      "updated_at": "2026-07-13T07:12:26Z",
       "url": "https://github.com/zeokin/Cuda-Compute-OSS/pull/192"
     },
     {
@@ -108,73 +68,21 @@
       "pr": 194,
       "state": "eval_pending",
       "title": "feat(strategy): add nystrom landmark-column transform for low-rank data",
-      "updated_at": "2026-07-13T07:08:57Z",
+      "updated_at": "2026-07-13T07:12:32Z",
       "url": "https://github.com/zeokin/Cuda-Compute-OSS/pull/194"
-    },
-    {
-      "author": "joaovictor91123",
-      "detail": "CPU-safe CI only; no GPU scorecard or queue entry required.",
-      "gpu_required": false,
-      "head_sha": "fed67dc04e0f4e8fcc0ca590eac871bb6fadf256",
-      "kind": "fix",
-      "label": "status:ready-non-gpu",
-      "pr": 209,
-      "state": "non_gpu_review",
-      "title": "fix(matmul): validate dtype in the public matmul() API up front (Fixes #208)",
-      "updated_at": "2026-07-13T07:08:59Z",
-      "url": "https://github.com/zeokin/Cuda-Compute-OSS/pull/209"
     },
     {
       "author": "galuis116",
       "detail": "CPU-safe CI only; no GPU scorecard or queue entry required.",
       "gpu_required": false,
-      "head_sha": "dbe9919215b74838c24a88c760945e3e9a108945",
+      "head_sha": "1e59dc7eab7c8d38797c724df802999277669ee6",
       "kind": "fix",
       "label": "status:ready-non-gpu",
-      "pr": 211,
+      "pr": 215,
       "state": "non_gpu_review",
-      "title": "fix(strategy): honour --vram-fraction in rsvd basis construction",
-      "updated_at": "2026-07-13T07:09:04Z",
-      "url": "https://github.com/zeokin/Cuda-Compute-OSS/pull/211"
-    },
-    {
-      "author": "statxc",
-      "detail": "CPU-safe CI only; no GPU scorecard or queue entry required.",
-      "gpu_required": false,
-      "head_sha": "f2847baf2533f5ec235faa95f7e3967cde39aee8",
-      "kind": "docs",
-      "label": "status:ready-non-gpu",
-      "pr": 218,
-      "state": "non_gpu_review",
-      "title": "fix(docs): list the decaying-spectrum fill in strategy README --fill flags",
-      "updated_at": "2026-07-13T07:09:09Z",
-      "url": "https://github.com/zeokin/Cuda-Compute-OSS/pull/218"
-    },
-    {
-      "author": "statxc",
-      "detail": "CPU-safe CI only; no GPU scorecard or queue entry required.",
-      "gpu_required": false,
-      "head_sha": "2afc0904543f31a18c6ff2a77a8b057f44d161c7",
-      "kind": "fix",
-      "label": "status:ready-non-gpu",
-      "pr": 219,
-      "state": "non_gpu_review",
-      "title": "fix(attention): build the QKV generator on the tensors' device (fixes cuda:N mismatch)",
-      "updated_at": "2026-07-13T07:09:14Z",
-      "url": "https://github.com/zeokin/Cuda-Compute-OSS/pull/219"
-    },
-    {
-      "author": "RenzoMXD",
-      "detail": "CPU-safe CI only; no GPU scorecard or queue entry required.",
-      "gpu_required": false,
-      "head_sha": "dad8fc6bba2afe7ddd618a12fd39e2f145b39c89",
-      "kind": "fix",
-      "label": "status:ready-non-gpu",
-      "pr": 214,
-      "state": "non_gpu_review",
-      "title": "fix(runner): clean up disk-backed A/B/C on a raise, not just on success",
-      "updated_at": "2026-07-13T07:09:19Z",
-      "url": "https://github.com/zeokin/Cuda-Compute-OSS/pull/214"
+      "title": "fix(strategy): stop reporting a <1x FLOP ratio as \"fewer FLOPs than exact\"",
+      "updated_at": "2026-07-13T07:24:49Z",
+      "url": "https://github.com/zeokin/Cuda-Compute-OSS/pull/215"
     }
   ],
   "queue": [
@@ -182,28 +90,14 @@
       "author": "ultrahighsuper",
       "detail": "gate chain passed; GPU eval runner is not wired up yet in this repo (Phase 2)",
       "gpu_required": true,
-      "head_sha": "7c7fe70b1b3ae8c1363f82fc2dd66bc8df68bb65",
-      "kind": "feat",
-      "label": "status:queued-gpu",
-      "position": 1,
-      "pr": 156,
-      "state": "eval_pending",
-      "title": "feat(strategy): rsvd captures 3 subspaces, not 4 (drop redundant col(B) sketch)",
-      "updated_at": "2026-07-13T07:08:42Z",
-      "url": "https://github.com/zeokin/Cuda-Compute-OSS/pull/156"
-    },
-    {
-      "author": "ultrahighsuper",
-      "detail": "gate chain passed; GPU eval runner is not wired up yet in this repo (Phase 2)",
-      "gpu_required": true,
       "head_sha": "5d347790a81bd2644ebf77ad0caa81b4b17aaa4c",
       "kind": "feat",
       "label": "status:queued-gpu",
-      "position": 2,
+      "position": 1,
       "pr": 185,
       "state": "eval_pending",
       "title": "feat(strategy): subspace-iteration transform for decaying spectra",
-      "updated_at": "2026-07-13T07:08:47Z",
+      "updated_at": "2026-07-13T07:12:20Z",
       "url": "https://github.com/zeokin/Cuda-Compute-OSS/pull/185"
     },
     {
@@ -213,11 +107,11 @@
       "head_sha": "43d9365c55fc7f01fce825e8bb3a92e8f9d81fae",
       "kind": "feat",
       "label": "status:queued-gpu",
-      "position": 3,
+      "position": 2,
       "pr": 192,
       "state": "eval_pending",
       "title": "feat(strategy): add fixed DCT-II basis transform for smooth data",
-      "updated_at": "2026-07-13T07:08:52Z",
+      "updated_at": "2026-07-13T07:12:26Z",
       "url": "https://github.com/zeokin/Cuda-Compute-OSS/pull/192"
     },
     {
@@ -227,13 +121,13 @@
       "head_sha": "eea1f2be87190911ed4f0a78ad4905ec3bd8a26d",
       "kind": "feat",
       "label": "status:queued-gpu",
-      "position": 4,
+      "position": 3,
       "pr": 194,
       "state": "eval_pending",
       "title": "feat(strategy): add nystrom landmark-column transform for low-rank data",
-      "updated_at": "2026-07-13T07:08:57Z",
+      "updated_at": "2026-07-13T07:12:32Z",
       "url": "https://github.com/zeokin/Cuda-Compute-OSS/pull/194"
     }
   ],
-  "updated": "2026-07-13T07:13:01+00:00"
+  "updated": "2026-07-13T07:28:14+00:00"
 }
