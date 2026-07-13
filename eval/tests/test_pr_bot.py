@@ -764,6 +764,25 @@ def test_exec_does_not_retry_non_transient():
     assert raised and calls["n"] == 1   # raised immediately, no wasted retries
 
 
+def test_declared_track_parses_checked_box():
+    from eval.pr_bot import declared_track
+    body = "## Target track\n- [ ] full-rank\n- [x] low-rank\n- [ ] decaying-spectrum\n"
+    assert declared_track(body) == "low-rank"
+    assert declared_track("- [X] decaying-spectrum — smooth data") == "decaying-spectrum"
+    assert declared_track("- [ ] full-rank\n- [ ] low-rank") is None   # none checked
+    assert declared_track("") is None
+
+
+def test_queue_record_carries_declared_track():
+    from eval.pr_bot import _queue_record, GateOutcome
+    pr = _pr(number=7, body="- [x] low-rank\n" + SCORECARD_BODY)
+    rec = _queue_record(pr, GateOutcome(7, "eval_pending", kind="feat"))
+    assert rec["track"] == "low-rank"
+    # unspecified track -> None (gpu bot falls back to the full-rank reference)
+    pr2 = _pr(number=8, body=SCORECARD_BODY)
+    assert _queue_record(pr2, GateOutcome(8, "eval_pending", kind="feat"))["track"] is None
+
+
 if __name__ == "__main__":
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     failed = 0

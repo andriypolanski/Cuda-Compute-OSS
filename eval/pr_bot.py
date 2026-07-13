@@ -87,6 +87,13 @@ STRATEGY_HINT_RE = re.compile(
     r"register_transform|class\s+\w+\(Transform\)|\btransform\b|\bstrategy\b",
     re.IGNORECASE,
 )
+# The target track a feat PR declares in its template (checked box). The GPU bot
+# scores the PR at THIS track's pinned regime (eval.tracks), so it must ride on
+# the queue entry -- gpu_batch reads it, and can't guess the regime otherwise.
+TRACK_BODY_RE = re.compile(
+    r"^\s*-\s*\[[xX]\]\s*(full-rank|low-rank|decaying-spectrum)\b",
+    re.IGNORECASE | re.MULTILINE,
+)
 CODING_AGENT_COAUTHOR_RE = re.compile(
     r"(?im)^co-authored-by:\s*.*"
     r"(cursor|codex|claude|copilot|openai|anthropic|aider|windsurf|devin|"
@@ -200,6 +207,16 @@ def has_merge_conflict(pr: PRInfo) -> bool:
 
 def has_scorecard(body: str) -> bool:
     return bool(SCORECARD_RE.search(body or ""))
+
+
+def declared_track(body: str) -> str | None:
+    """The track a feat PR declares in its template, or None if unspecified.
+
+    The GPU bot scores at this track's pinned regime (eval.tracks); an
+    unspecified track means the bot falls back to the full-rank reference.
+    """
+    m = TRACK_BODY_RE.search(body or "")
+    return m.group(1).lower() if m else None
 
 
 def has_coding_agent_coauthor(commit_messages: str) -> bool:
@@ -573,6 +590,7 @@ def _queue_record(pr: PRInfo, outcome: GateOutcome, position: int | None = None)
         "updated_at": pr.updated_at,
         "kind": outcome.kind,
         "gpu_required": outcome.kind == "feat",
+        "track": declared_track(pr.body),
         "state": outcome.action,
         "detail": outcome.detail,
     }
