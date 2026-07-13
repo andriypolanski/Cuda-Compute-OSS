@@ -36,9 +36,10 @@ def _parse_args(argv=None) -> argparse.Namespace:
     p.add_argument("--transforms", default=None,
                    help="comma-separated transform names (default: all registered: "
                         + ",".join(_transforms.available()) + ")")
-    p.add_argument("--min-accuracy", type=float, default=0.8,
-                   help="accuracy below this hard-gates a transform's score to 0 "
-                        "(default 0.8; use 0 to disable)")
+    p.add_argument("--min-accuracy", type=float, default=None,
+                   help="accuracy below this hard-gates a transform's score to 0. "
+                        "default: the per-track floor for --fill (full-rank 0.80, "
+                        "low-rank 0.95, decaying-spectrum 0.90); use 0 to disable")
     p.add_argument("--vram-unit", choices=("bytes", "mib", "gib"), default="gib",
                    help="unit for Peak_VRAM inside the score. default gib")
     p.add_argument("--seed", type=int, default=None,

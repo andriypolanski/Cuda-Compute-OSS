@@ -32,6 +32,24 @@ from . import metrics
 from .memory import MemoryProbe
 
 
+#: Per-track accuracy floors (whitepaper 6.2). A strategy scores 0 unless its
+#: accuracy clears its track's floor. Keyed by ``fill``. Full-rank is the honest
+#: hard case (0.80); low-rank is the easy case, so it must clear a higher bar
+#: (0.95); decaying-spectrum sits between (0.90).
+TRACK_FLOORS = {
+    "random": 0.80,             # full-rank track
+    "iota": 0.80,
+    "lowrank": 0.95,            # low-rank track
+    "decaying-spectrum": 0.90,
+}
+DEFAULT_ACCURACY_FLOOR = 0.80
+
+
+def default_floor(fill: str) -> float:
+    """The accuracy floor for ``fill``'s track (see :data:`TRACK_FLOORS`)."""
+    return TRACK_FLOORS.get(fill, DEFAULT_ACCURACY_FLOOR)
+
+
 @dataclass
 class EvalConfig:
     """Knobs for one evaluation sweep.
@@ -48,8 +66,10 @@ class EvalConfig:
     data_rank    : rank used when fill='lowrank' or 'decaying-spectrum'
                    (None => N//32).
     transforms   : transform names to evaluate (None => all registered).
-    accuracy_floor: accuracy below this hard-gates the score to 0 (default 0.8;
-                    set 0.0 to disable the gate).
+    accuracy_floor: accuracy below this hard-gates the score to 0. None (the
+                    default) uses the per-track floor for ``fill`` (full-rank
+                    0.80, low-rank 0.95, decaying-spectrum 0.90); pass a float to
+                    override (0.0 disables the gate).
     vram_unit    : unit for Peak_VRAM inside the score ('gib'|'mib'|'bytes').
     seed         : base RNG seed (pair i uses seed+2i, seed+2i+1). None (the
                    default) draws a fresh unpredictable seed each run --
@@ -66,11 +86,18 @@ class EvalConfig:
     fill: str = "random"          # full-rank by default (the honest, general case)
     data_rank: int | None = None
     transforms: list[str] | None = None
-    accuracy_floor: float = 0.8
+    accuracy_floor: float | None = None
     vram_unit: str = "gib"
     seed: int | None = None
     device: int = 0
     verbose: bool = True
+
+    def __post_init__(self):
+        # None => use the per-track floor for this fill (whitepaper 6.2). An
+        # explicit float overrides it (e.g. contributor self-runs, or a track
+        # whose floor is being tuned).
+        if self.accuracy_floor is None:
+            self.accuracy_floor = default_floor(self.fill)
 
 
 def _resolve_seed(seed: int | None) -> int:
