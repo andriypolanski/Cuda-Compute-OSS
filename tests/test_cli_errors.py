@@ -95,6 +95,7 @@ BENCHMARK_BAD_ARGS = [
     # pair each with that mode -- otherwise the invalid value is never reached.
     ["--seq", "8", "--mode", "corrfft", "--temperature", "0"],   # temperature > 0
     ["--seq", "8", "--mode", "landmark", "--landmarks", "0"],    # num_landmarks > 0
+    ["--seq", "8", "--mode", "adaptive", "--gate-strength", "-0.1"],  # gate_strength >= 0
 ]
 
 
