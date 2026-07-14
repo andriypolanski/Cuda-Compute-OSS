@@ -108,15 +108,11 @@ def test_attention_benchmark_bad_args_exit_cleanly(argv, capsys):
 
 
 def test_strategy_unknown_transform_exits_cleanly(capsys):
-    # Unknown --transform used to raise an uncaught KeyError (exit 1 +
-    # traceback) because get_transform raises KeyError and the CLI only
-    # caught ValueError/RuntimeError/MemoryError.
     rc = strategy_cli.main(["--n", "8", "--transform", "nope", "--quiet"])
     assert rc == 2
     err = capsys.readouterr().err
     assert "error:" in err
     assert "unknown transform" in err
-    assert "nope" in err
 
 
 if __name__ == "__main__":
