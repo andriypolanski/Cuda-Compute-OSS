@@ -50,6 +50,7 @@ def test_bad_data_rank_exits_cleanly(argv, capsys):
 STRATEGY_BAD_RANK_M_ARGS = [
     ["--n", "8", "--rank-m", "0"],     # non-positive: rank_m must be >= 1
     ["--n", "8", "--rank-m", "-2"],    # negative: previously hit GPU before subspace
+    ["--n", "8", "--rank-m", "100"],   # rank_m > n: previously hit GPU before subspace
 ]
 
 
