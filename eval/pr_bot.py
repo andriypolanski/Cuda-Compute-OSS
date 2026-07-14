@@ -135,8 +135,15 @@ def already_queued(comments: list, head_sha: str) -> bool:
     return any(marker in c for c in comments)
 
 
-def already_evaluated(pr_number: int, comments: list) -> bool:
-    marker = RESULT_MARKER_PREFIX.format(pr=pr_number)
+def already_evaluated(pr_number: int, comments: list, head_sha: str) -> bool:
+    """True if this PR+commit already has a posted GPU result marker.
+
+    Markers are commit-scoped (``<!-- cco-result:{pr}:{commit} -->``), matching
+    ``result_bot.RESULT_MARKER`` and the SHA-scoped ``already_queued`` path.
+    A new head SHA therefore re-queues for scoring, and a forged comment for a
+    dead SHA cannot permanently skip evaluation of the current head.
+    """
+    marker = RESULT_MARKER_PREFIX.format(pr=pr_number) + f"{head_sha} -->"
     return any(marker in c for c in comments)
 
 
@@ -490,7 +497,7 @@ def process_pr(
             kind=kind,
         )
 
-    if already_evaluated(pr.number, comments):
+    if already_evaluated(pr.number, comments, pr.head_sha):
         return GateOutcome(pr.number, "already_evaluated", kind=kind)
 
     if kind in {"fix", "docs"}:

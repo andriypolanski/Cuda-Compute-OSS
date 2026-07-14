@@ -255,8 +255,19 @@ def test_has_scorecard_matches_labeler_ymls_detector():
 
 
 def test_already_evaluated_helper():
-    assert already_evaluated(1, ["x", "<!-- cco-result:1:abc -->"])
-    assert not already_evaluated(1, ["x", "<!-- cco-eval:abc -->"])
+    # Marker must match this PR's current head SHA (commit-scoped, like already_queued).
+    assert already_evaluated(1, ["x", "<!-- cco-result:1:abc -->"], "abc")
+    assert not already_evaluated(1, ["x", "<!-- cco-result:1:abc -->"], "other")
+    assert not already_evaluated(1, ["x", "<!-- cco-eval:abc -->"], "abc")
+    # A forged / stale marker for a dead SHA must not skip the current head.
+    assert not already_evaluated(1, ["x", "<!-- cco-result:1:deadbeef -->"], "abc")
+
+
+def test_process_pr_requeues_after_new_commit_despite_stale_result_marker():
+    # Old result for sha0 must not permanently block scoring of sha1.
+    pr = _pr(head_sha="sha1", body=SCORECARD_BODY)
+    out = process_pr(pr, SOME_DIFF, ["<!-- cco-result:1:sha0 -->"], frozenset(), [])
+    assert out.action == "eval_pending"
 
 
 def test_already_queued_helper():
