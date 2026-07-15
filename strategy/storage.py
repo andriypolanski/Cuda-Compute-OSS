@@ -6,6 +6,7 @@ holding it fully in RAM; slicing a tile pulls only that tile off disk.
 from __future__ import annotations
 
 import os
+from numbers import Integral
 import numpy as np
 
 
@@ -111,6 +112,11 @@ def generate(
     data_rank: int | None = None,
     spectral_alpha: float = 1.0,
 ) -> np.ndarray:
+    if data_rank is not None and (
+        isinstance(data_rank, bool) or not isinstance(data_rank, Integral)
+        or data_rank < 1
+    ):
+        raise ValueError("data_rank must be a positive integer or None")
     mat = allocate(n, dtype, on_disk, path)
     if fill == "random":
         _fill_random(mat, seed, scale)
@@ -119,10 +125,10 @@ def generate(
     elif fill == "zeros":
         mat[:] = 0
     elif fill == "lowrank":
-        r = data_rank or max(1, n // 32)
+        r = data_rank if data_rank is not None else max(1, n // 32)
         _fill_lowrank(mat, seed, min(r, n))
     elif fill == "decaying-spectrum":
-        r = data_rank or max(1, n // 32)
+        r = data_rank if data_rank is not None else max(1, n // 32)
         _fill_decaying_spectrum(mat, seed, min(r, n), spectral_alpha)
     else:
         raise ValueError(f"unknown fill {fill!r}")
