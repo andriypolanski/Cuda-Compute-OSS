@@ -6,6 +6,7 @@ contract, backing the corrected --data-rank help text.
 from __future__ import annotations
 
 import numpy as np
+import pytest
 
 from strategy import storage
 
@@ -30,6 +31,21 @@ def test_default_data_rank_is_floored_at_one():
     m = storage.generate(16, np.float64, False, None, seed=0,
                          fill="decaying-spectrum", data_rank=None)
     assert np.linalg.matrix_rank(m) == 1
+
+
+@pytest.mark.parametrize("fill", ("lowrank", "decaying-spectrum"))
+@pytest.mark.parametrize("data_rank", (0, -1, 1.5, True))
+def test_data_rank_is_validated_before_generation(fill, data_rank):
+    with pytest.raises(ValueError, match="data_rank must be a positive integer or None"):
+        storage.generate(16, np.float32, False, None, seed=0,
+                         fill=fill, data_rank=data_rank)
+
+
+@pytest.mark.parametrize("fill", ("lowrank", "decaying-spectrum"))
+def test_data_rank_accepts_numpy_integers(fill):
+    matrix = storage.generate(16, np.float32, False, None, seed=0,
+                              fill=fill, data_rank=np.int64(2))
+    assert np.linalg.matrix_rank(matrix) == 2
 
 
 if __name__ == "__main__":
