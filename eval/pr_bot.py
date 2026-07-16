@@ -68,7 +68,7 @@ DOCS_ONLY_EXACT = frozenset({"LICENSE"})
 # Phase 2's real runner is the actual authority on whether a PR improved
 # anything -- this is only a courtesy pre-filter.
 SCORECARD_RE = re.compile(
-    r"accuracy[^\n]*[0-9]|latency[^\n]*[0-9]|RESULT_JSON", re.IGNORECASE
+    r"accuracy\s*\|?\s*[0-9]|latency\s*\|?\s*[0-9]|RESULT_JSON", re.IGNORECASE
 )
 FIX_TITLE_RE = re.compile(r"^\s*(fix|bug)(\([^)]+\))?:|\[\s*(fix|bug)\s*\]", re.IGNORECASE)
 FEAT_TITLE_RE = re.compile(
@@ -218,8 +218,8 @@ def has_scorecard(body: str) -> bool:
 def declared_track(body: str) -> str | None:
     """The track a feat PR declares in its template, or None if unspecified.
 
-    The GPU bot scores at this track's pinned regime (eval.tracks); an
-    unspecified track means the bot falls back to the full-rank reference.
+    The GPU bot scores at this track's pinned regime (eval.tracks). A feature
+    PR without one cannot be scored safely and must not enter the GPU queue.
     """
     m = TRACK_BODY_RE.search(body or "")
     return m.group(1).lower() if m else None
@@ -229,8 +229,8 @@ def declared_transform(body: str) -> str | None:
     """The transform name a feat PR declares in its template, or None.
 
     The GPU bot scores THIS transform (and verifies, post-rebase, that the PR's
-    diff actually adds/modifies it). None / the unfilled placeholder means the
-    bot falls back to the best-scoring transform in the run.
+    diff actually adds/modifies it). None / the unfilled placeholder blocks
+    GPU scoring; the bot must never fall back to another transform's result.
     """
     m = TRANSFORM_DECL_RE.search(body or "")
     name = m.group(1) if m else None
@@ -379,7 +379,8 @@ def process_pr(
     action values: skip_draft, close_blocked, close_excess_open_pr,
     needs_merge_conflict_resolution, close_stale_merge_conflict,
     close_coding_agent_coauthor, close_protected_path, close_missing_pr_kind,
-    close_missing_scorecard, maintainer_changes_requested,
+    close_missing_scorecard, close_missing_evaluation_declaration,
+    maintainer_changes_requested,
     close_stale_maintainer_changes, copycat_block, copycat_warn,
     already_evaluated, non_gpu_review, eval_pending, evaluated.
     """
@@ -513,6 +514,17 @@ def process_pr(
             kind=kind,
         )
 
+    if not declared_track(pr.body) or not declared_transform(pr.body):
+        return GateOutcome(
+            pr.number,
+            "close_missing_evaluation_declaration",
+            detail=(
+                "Closing this feat/strategy PR because it must declare exactly one checked "
+                "target track and a named **Transform:** candidate before GPU queueing."
+            ),
+            kind=kind,
+        )
+
     if run_eval is None:
         return GateOutcome(pr.number, "eval_pending",
                            detail="gate chain passed; GPU eval runner is not "
@@ -554,6 +566,8 @@ def _apply(client: GitHubClient, pr: PRInfo, outcome: GateOutcome, comments: lis
     elif outcome.action == "close_missing_pr_kind":
         client.close_pr(pr.number, outcome.detail)
     elif outcome.action == "close_missing_scorecard":
+        client.close_pr(pr.number, outcome.detail)
+    elif outcome.action == "close_missing_evaluation_declaration":
         client.close_pr(pr.number, outcome.detail)
     elif outcome.action == "close_stale_maintainer_changes":
         client.close_pr(pr.number, outcome.detail)

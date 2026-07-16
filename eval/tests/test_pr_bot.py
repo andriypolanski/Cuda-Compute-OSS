@@ -47,6 +47,13 @@ Adds a new transform.
 |---|---|
 | accuracy | 0.991 |
 | latency | 0.42s |
+
+## Target track
+- [x] full-rank
+- [ ] low-rank
+- [ ] decaying-spectrum
+
+**Transform:** `foo`
 """
 
 NO_SCORECARD_BODY = "Adds a new transform. No testing done yet."
@@ -231,6 +238,12 @@ def test_missing_scorecard_is_flagged():
     assert out.action == "close_missing_scorecard"
 
 
+def test_feature_without_track_and_transform_is_not_queued():
+    body = "| accuracy | 0.991 |\n| latency | 0.42s |"
+    out = process_pr(_pr(body=body), SOME_DIFF, [], frozenset(), [])
+    assert out.action == "close_missing_evaluation_declaration"
+
+
 def test_clean_pr_with_no_runner_is_eval_pending():
     out = process_pr(_pr(body=SCORECARD_BODY), SOME_DIFF, [], frozenset(), [], run_eval=None)
     assert out.action == "eval_pending"
@@ -247,8 +260,10 @@ def test_clean_pr_with_runner_is_evaluated():
 def test_has_scorecard_matches_labeler_ymls_detector():
     assert has_scorecard(SCORECARD_BODY)
     assert has_scorecard("here is my RESULT_JSON {...}")
-    assert has_scorecard("| latency | exact 632.06 ms |")
+    assert not has_scorecard("| latency | exact 632.06 ms |")
     assert has_scorecard("| accuracy | 1.0 (reference) |")
+    assert not has_scorecard("accuracy floor 0.90 is required")
+    assert not has_scorecard("latency trade-off is documented")
     assert not has_scorecard(NO_SCORECARD_BODY)
     assert not has_scorecard("")
     assert not has_scorecard(None)
@@ -458,6 +473,14 @@ def test_run_once_live_mode_applies_actions():
     pr1.body = NO_SCORECARD_BODY
     outcomes = run_once(client, dry_run=False)
     assert outcomes[0].action == "close_missing_scorecard"
+    assert ("close_pr", 1, outcomes[0].detail) in client.actions
+
+
+def test_run_once_live_mode_closes_missing_evaluation_declaration():
+    pr1 = _pr(number=1, body="| accuracy | 0.991 |\n| latency | 0.42s |")
+    client = FakeClient(prs={"all": [pr1], "open": [pr1]}, diffs={1: SOME_DIFF})
+    outcomes = run_once(client, dry_run=False)
+    assert outcomes[0].action == "close_missing_evaluation_declaration"
     assert ("close_pr", 1, outcomes[0].detail) in client.actions
 
 
@@ -778,8 +801,8 @@ def test_queue_record_carries_declared_track():
     pr = _pr(number=7, body="- [x] low-rank\n" + SCORECARD_BODY)
     rec = _queue_record(pr, GateOutcome(7, "eval_pending", kind="feat"))
     assert rec["track"] == "low-rank"
-    # unspecified track -> None (gpu bot falls back to the full-rank reference)
-    pr2 = _pr(number=8, body=SCORECARD_BODY)
+    # The queue records an unspecified track as None; process_pr blocks it.
+    pr2 = _pr(number=8, body="| accuracy | 0.991 |\n| latency | 0.42s |")
     assert _queue_record(pr2, GateOutcome(8, "eval_pending", kind="feat"))["track"] is None
 
 
