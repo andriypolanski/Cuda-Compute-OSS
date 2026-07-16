@@ -68,7 +68,7 @@ DOCS_ONLY_EXACT = frozenset({"LICENSE"})
 # Phase 2's real runner is the actual authority on whether a PR improved
 # anything -- this is only a courtesy pre-filter.
 SCORECARD_RE = re.compile(
-    r"accuracy[^\n]*[0-9]|latency[^\n]*[0-9]|RESULT_JSON", re.IGNORECASE
+    r"accuracy\s*\|?\s*[0-9]|latency\s*\|?\s*[0-9]|RESULT_JSON", re.IGNORECASE
 )
 FIX_TITLE_RE = re.compile(r"^\s*(fix|bug)(\([^)]+\))?:|\[\s*(fix|bug)\s*\]", re.IGNORECASE)
 FEAT_TITLE_RE = re.compile(

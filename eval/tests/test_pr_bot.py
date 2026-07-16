@@ -261,8 +261,10 @@ def test_clean_pr_with_runner_is_evaluated():
 def test_has_scorecard_matches_labeler_ymls_detector():
     assert has_scorecard(SCORECARD_BODY)
     assert has_scorecard("here is my RESULT_JSON {...}")
-    assert has_scorecard("| latency | exact 632.06 ms |")
+    assert not has_scorecard("| latency | exact 632.06 ms |")
     assert has_scorecard("| accuracy | 1.0 (reference) |")
+    assert not has_scorecard("accuracy floor 0.90 is required")
+    assert not has_scorecard("latency trade-off is documented")
     assert not has_scorecard(NO_SCORECARD_BODY)
     assert not has_scorecard("")
     assert not has_scorecard(None)
