@@ -75,8 +75,14 @@ def _exact_tile(n: int, backend: Backend, item_bytes: int, frac: float) -> int:
 # streaming BLAS-3 primitives (row-block streamed; memmap-friendly)
 # ---------------------------------------------------------------------------
 def stream_gemm_right(X, Q, backend: Backend, dtype,
-                      frac: float = _DEFAULT_ROW_BLOCK_FRACTION):
-    """Return X @ Q  (n x m), streaming the rows of X. Q is resident (n x m)."""
+                      frac: float = _DEFAULT_ROW_BLOCK_FRACTION,
+                      extra_fixed_bytes: int = 0):
+    """Return X @ Q  (n x m), streaming the rows of X. Q is resident (n x m).
+
+    ``extra_fixed_bytes`` is caller-resident device memory that stays live for
+    the whole call (e.g. earlier rsvd sketch parts) and is invisible to
+    ``free_compute_bytes()`` on MPS, so it must be charged like ``out``.
+    """
     xp = backend.xp
     n, m = X.shape[0], Q.shape[1]
     item = np.dtype(dtype).itemsize
@@ -88,7 +94,8 @@ def stream_gemm_right(X, Q, backend: Backend, dtype,
     # entire budget at M = N), risking OOM. Each block also allocates
     # matmul(Xr, Q) -> (blk, m): m output cols per staged row.
     blk = _row_block(n, X.shape[1], backend, item, frac,
-                     out_cols=m, fixed_bytes=n * m * item)
+                     out_cols=m,
+                     fixed_bytes=n * m * item + int(extra_fixed_bytes))
     for r0 in range(0, n, blk):
         r1 = min(n, r0 + blk)
         Xr = backend.to_device(np.asarray(X[r0:r1, :]).astype(dtype, copy=False))
@@ -97,9 +104,15 @@ def stream_gemm_right(X, Q, backend: Backend, dtype,
 
 
 def stream_gemm_left_t(X, Q, backend: Backend, dtype,
-                       frac: float = _DEFAULT_ROW_BLOCK_FRACTION):
+                       frac: float = _DEFAULT_ROW_BLOCK_FRACTION,
+                       extra_fixed_bytes: int = 0):
     """Return X^T @ Q  (n x m) for square X, streaming the rows of X:
-    X^T @ Q = sum over row-blocks of X[rb,:]^T @ Q[rb,:]."""
+    X^T @ Q = sum over row-blocks of X[rb,:]^T @ Q[rb,:].
+
+    ``extra_fixed_bytes`` is caller-resident device memory that stays live for
+    the whole call (e.g. earlier rsvd sketch parts) and is invisible to
+    ``free_compute_bytes()`` on MPS, so it must be charged like ``acc``.
+    """
     xp = backend.xp
     n, m = X.shape[0], Q.shape[1]
     acc = xp.zeros((n, m), dtype=dtype)
@@ -111,7 +124,7 @@ def stream_gemm_left_t(X, Q, backend: Backend, dtype,
     # OOM (cf. #138 and stream_gemm_right's resident output).
     item = np.dtype(dtype).itemsize
     blk = _row_block(n, X.shape[1], backend, item, frac,
-                     fixed_bytes=2 * n * m * item)
+                     fixed_bytes=2 * n * m * item + int(extra_fixed_bytes))
     for r0 in range(0, n, blk):
         r1 = min(n, r0 + blk)
         Xr = backend.to_device(np.asarray(X[r0:r1, :]).astype(dtype, copy=False))
