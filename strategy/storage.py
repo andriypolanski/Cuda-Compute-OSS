@@ -54,11 +54,18 @@ def _fill_iota(mat: np.ndarray, seed: int = 0) -> None:
 
 def _fill_lowrank(mat: np.ndarray, seed: int, rank: int) -> None:
     """Fill with a rank-``rank`` matrix (U @ V, rank << n) row-block at a time.
-    This is the regime where the subspace strategy is accurate."""
+    This is the regime where the subspace strategy is accurate.
+
+    ``V`` is built in place: ``standard_normal`` already returns float64, so an
+    out-of-place ``* scale`` plus a redundant ``.astype(np.float64)`` would keep
+    two full ``(rank, n)`` buffers alive (~2× host peak) even when ``mat`` is a
+    disk memmap — enough to OOM generation at large n / default rank.
+    """
     n = mat.shape[0]
     rng = np.random.default_rng(seed)
     scale = 1.0 / np.sqrt(rank)
-    V = (rng.standard_normal((rank, n)) * scale).astype(np.float64)
+    V = rng.standard_normal((rank, n))
+    V *= scale
     block = max(1, min(n, (256 * 1024**2) // (n * 8)))
     for r0 in range(0, n, block):
         r1 = min(n, r0 + block)
@@ -73,11 +80,16 @@ def _fill_decaying_spectrum(mat: np.ndarray, seed: int, rank: int, alpha: float 
     k^-alpha (k=1..rank), unlike _fill_lowrank's uniform weighting. Most of
     the energy sits in the first few components with a long, genuinely small
     (not zero) tail -- tests whether a transform prioritizes the strongest
-    structure rather than needing the full rank to be accurate."""
+    structure rather than needing the full rank to be accurate.
+
+    Same in-place ``V`` construction as ``_fill_lowrank`` — avoid a second
+    full-size float64 temporary during scale (and the useless same-dtype copy).
+    """
     n = mat.shape[0]
     rng = np.random.default_rng(seed)
     scale = 1.0 / np.sqrt(rank)
-    V = (rng.standard_normal((rank, n)) * scale).astype(np.float64)
+    V = rng.standard_normal((rank, n))
+    V *= scale
     weights = np.arange(1, rank + 1, dtype=np.float64) ** -alpha
     V *= weights[:, None]
     block = max(1, min(n, (256 * 1024**2) // (n * 8)))
