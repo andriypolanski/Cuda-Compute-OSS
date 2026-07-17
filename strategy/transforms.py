@@ -102,13 +102,31 @@ class RandomizedSVDTransform(Transform):
                 rng.standard_normal((n, w)).astype(dtype, copy=False)
             )
 
+        # Each sketch result stays in ``parts`` while later sketches run. On MPS
+        # free_compute_bytes() is a static ceiling, so those prior (n, w_i)
+        # buffers are invisible unless charged as extra_fixed_bytes -- otherwise
+        # sketches 2/3 size their row-blocks as if the budget were empty and can
+        # OOM (~1.24x overshoot at n=8192, m=1024, fp32, frac=0.3).
+        item = np.dtype(dtype).itemsize
         parts = []
+        prior_bytes = 0
         if widths[0]:
-            parts.append(stream_gemm_right(A, omega(widths[0]), backend, dtype, frac))   # col(A): A Ω
+            parts.append(stream_gemm_right(
+                A, omega(widths[0]), backend, dtype, frac,
+                extra_fixed_bytes=prior_bytes,
+            ))   # col(A): A Ω
+            prior_bytes += n * widths[0] * item
         if widths[1]:
-            parts.append(stream_gemm_left_t(A, omega(widths[1]), backend, dtype, frac))  # row(A): Aᵀ Ω
+            parts.append(stream_gemm_left_t(
+                A, omega(widths[1]), backend, dtype, frac,
+                extra_fixed_bytes=prior_bytes,
+            ))   # row(A): Aᵀ Ω
+            prior_bytes += n * widths[1] * item
         if widths[2]:
-            parts.append(stream_gemm_left_t(B, omega(widths[2]), backend, dtype, frac))  # row(B): Bᵀ Ω
+            parts.append(stream_gemm_left_t(
+                B, omega(widths[2]), backend, dtype, frac,
+                extra_fixed_bytes=prior_bytes,
+            ))   # row(B): Bᵀ Ω
 
         Y = xp.concatenate(parts, axis=1)      # (n, m)
         return self._orthonormalize(Y, backend)  # (n, m) orthonormal columns

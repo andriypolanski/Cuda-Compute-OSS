@@ -37,7 +37,8 @@ def _capture_fracs(frac_kwarg="__omit__", n=8, m=4):
     captured = []
     orig_r, orig_l = sub.stream_gemm_right, sub.stream_gemm_left_t
 
-    def fake(X, Q, backend, dtype, frac=sub._DEFAULT_ROW_BLOCK_FRACTION):
+    def fake(X, Q, backend, dtype, frac=sub._DEFAULT_ROW_BLOCK_FRACTION,
+             extra_fixed_bytes=0):
         captured.append(frac)
         return np.zeros((X.shape[0], Q.shape[1]), dtype=dtype)
 
